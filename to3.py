@@ -11,8 +11,6 @@ if os.path.exists(DB) and (not in_homedir):
 else:
   DB=os.path.join(os.path.expanduser("~"), ".todeux")
 
-USE_HG=os.path.exists(os.path.join(os.path.dirname(DB), ".hg"))
-
 todofile=re.compile(r"^(\d+)--([^~]+)$")
 
 def red(s):
@@ -86,7 +84,6 @@ def t_add(opts):
   with open(newfile, 'w') as f:
     f.writelines([textdesc+"\n","created: %s\n" % datetime.now().isoformat()])
   print "added: %s" % newfile
-  hg_add(newfile)
 
 def t_do(opts):
   """do <task>
@@ -103,7 +100,6 @@ def t_do(opts):
   openfn=os.path.join(DB, "open", fn)
   donefn=os.path.join(DB, "done", donefn)
   shutil.move(openfn, donefn)
-  hg_move(openfn, donefn)
   print "Closed: %s" % fn
 
 def t_show(opts):
@@ -129,7 +125,6 @@ def t_pri(opts):
   oldpath=os.path.join(DB, "open", fn)
   newpath=os.path.join(DB, "open", newfn)
   shutil.move(oldpath, newpath)
-  hg_move(oldpath, newpath)
   print newfn
 
 def t_edit(opts):
@@ -138,6 +133,25 @@ def t_edit(opts):
      """
   fn = os.path.abspath(os.path.join(DB, "open", taskfn_for_arg(opts[0])))
   os.system("vi +3 \"%s\"" % fn)
+
+def t_init(opts):
+  """init [--home]
+     Create new .todeux "database" in current directory.
+     With --home, creates non-project ~/.todeux directory. 
+     """
+  db=os.path.join(os.path.curdir, ".todeux")
+  if len(opts) > 0:
+    if opts[0] == '--home':
+      db=os.path.join(os.path.expanduser("~"), ".todeux")
+    else:
+      print "Unknown option for init: %s" % opts[0]
+      sys.exit()
+  if os.path.exists(db):
+    print "%s already exists, doing nothing" % db
+  else:
+    os.makedirs(os.path.join(db, "open"))
+    os.makedirs(os.path.join(db, "done"))
+    print "Created: %s" % db
 
 def taskfn_for_arg(a):
   hits = []
@@ -153,14 +167,6 @@ def taskfn_for_arg(a):
     sys.exit()
   return hits[0]
 
-def hg_add(path):
-  if not USE_HG: return
-  os.system("hg add \"%s\"" % path)
-
-def hg_move(oldpath, newpath):
-  if not USE_HG: return
-  os.system("hg rename --after \"%s\" \"%s\"" % (oldpath, newpath))
-
 if __name__ == '__main__':
   cmds = {
       None: t_list,
@@ -170,6 +176,7 @@ if __name__ == '__main__':
       'do'  : t_do,
       'show': t_show,
       'edit': t_edit,
+      'init': t_init,
       }
   c = None
   if len(sys.argv)>1:
@@ -187,3 +194,4 @@ if __name__ == '__main__':
       if k==None: continue
       cmddoc = cmds[k].__doc__
       print "  %s:\t %s" % (k, cmddoc)
+
